@@ -183,8 +183,6 @@ public:
 
         }
     }
-}
-    }
     void usun_autora_z_systemu() {
         // implementacja
     }
@@ -334,6 +332,9 @@ int main()
     cout << " 4. Ksiazka" << endl;
     cout << "5. Status" << endl;
     cout << "6. Biblioteka ogólne" << endl;
+    cin >> wybor;
+    cout << endl;
+    cout << endl;
 
     switch (wybor) {
     case 1: {
@@ -481,7 +482,7 @@ int main()
                 //oto lista ksiazek o tym tytule
                 ///////////////////////////////////////
                 cout << "Książki o tytule \"" << tytul << "\":" << endl;
-                for (const Ksiazka& ksiazka : biblioteka.get_zbior_ksiazek()) {
+                for (Ksiazka& ksiazka : biblioteka.get_zbior_ksiazek()) {
                     if (ksiazka.get_tytul() == tytul) {
                         ksiazka.sprawdz_szczegoly_ksiazki();
                     }
