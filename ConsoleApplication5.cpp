@@ -40,6 +40,7 @@ public:
 class Uzytkownik : public Osoba {
 public:
     Uzytkownik(const string& i, const string& n, const int& t, const string& e, const string& p) : Osoba(i, n, t, e, p) {}
+    Uzytkownik() {}
     void wyswietl_uzytkownika() {
         cout << Osoba::get_imie() << " " << Osoba::get_nazwisko() << endl << "telefon: " << Osoba::get_numer_telefonu() << endl
             << "email: " << Osoba::get_email() << endl << "pesel: " << Osoba::get_pesel() << endl;
@@ -119,8 +120,8 @@ public:
         }
         }
     }
-    void usun_uzytkownika_z_systemu() {
-        // implementacja
+    void usun_uzytkownika_z_systemu(Uzytkownik &U) {
+        delete &U;
     }
     void sprawdz_nieoplacone_grzywny() {
         // implementacja
@@ -182,8 +183,6 @@ public:
         }
 
         }
-    }
-}
     }
     void usun_autora_z_systemu() {
         // implementacja
@@ -271,9 +270,11 @@ class Biblioteka {
 private:
     vector<Ksiazka> zbior_ksiazek;
     vector<Wypozyczenie> wypozyczenia;
+    vector<Uzytkownik> uzytkownicy;
 public:
     vector<Ksiazka> get_zbior_ksiazek() { return zbior_ksiazek; }
     vector<Wypozyczenie> get_wypozyczenia() { return wypozyczenia; }
+    vector<Uzytkownik> get_uzytkownicy() { return uzytkownicy; }
     void dodaj_ksiazke(const Ksiazka& k) { zbior_ksiazek.push_back(k); }
     // Metoda zwracająca referencję do zbioru książek
     const vector<Ksiazka>& get_zbior_ksiazek() const { return zbior_ksiazek; }
@@ -328,12 +329,15 @@ int main()
     int wybor;
     cout << "Witamy w systemie bibliotecznym SBA :)" << endl;
     cout << "Proszę wybierać jeden z obszarów, w którym chcesz dokonać operacji: " << endl;
-    cout << " 1. Wypozyczenie/ Zwrot" << endl;
+    cout << "1. Wypozyczenie/ Zwrot" << endl;
     cout << "2. Użytkownik" << endl;
     cout << "3. Autor" << endl;
-    cout << " 4. Ksiazka" << endl;
+    cout << "4. Ksiazka" << endl;
     cout << "5. Status" << endl;
     cout << "6. Biblioteka ogólne" << endl;
+    cin >> wybor;
+    cout << endl;
+    cout << endl;
 
     switch (wybor) {
     case 1: {
@@ -383,24 +387,97 @@ int main()
         cout << endl;
         switch (decyzja)
         {
-        case 1:
-            // Implementacja
+        case 1: {
+            string pesel = "";
+            bool flaga_czy_uzytkownik_istnieje=false;
+            cout << "Podaj PESEL uzytkownika, ktorego dane chcesz sprawdzic: " << endl;
+            cin >> pesel;
+            cout << endl;
+            for (Uzytkownik& uzytkownik : biblioteka.get_uzytkownicy()) {
+                if (uzytkownik.get_pesel() == pesel) {
+                    cout << "Oto dane uzytkownika: " << endl;
+                    uzytkownik.sprawdz_dane_uzytkownika();
+                    flaga_czy_uzytkownik_istnieje = true;
+                }
+            }
+            if (!flaga_czy_uzytkownik_istnieje) {
+                cout << "Uzytkownik o podanym numerze PESEL nie istenieje w systemie." << endl;
+            }
             break;
-        case 2:
-            // Implementacja
+        }
+        case 2: {
+            string pesel = "";
+            bool flaga_czy_uzytkownik_istnieje = false;
+            cout << "Podaj PESEL uzytkownika, ktorego chcesz sprawdzic: " << endl;
+            cin >> pesel;
+            cout << endl;
+            for (Uzytkownik& uzytkownik : biblioteka.get_uzytkownicy()) {
+                if (uzytkownik.get_pesel() == pesel) {
+                    cout << "Uzytkownik o podanym numerze PESEL istnieje w systemie.: " << endl;
+                    flaga_czy_uzytkownik_istnieje = true;
+                }
+            }
+            if (!flaga_czy_uzytkownik_istnieje) {
+                cout << "Uzytkownik o podanym numerze PESEL nie istenieje w systemie." << endl;
+            }
             break;
-        case 3:
-            // Implementacja
+        }
+        case 3: {
+            Uzytkownik uzytkownik;
+            uzytkownik.dodaj_uzytkownika();
             break;
-        case 4:
-            // Implementacja
+        }
+        case 4: {
+            string pesel = "";
+            bool flaga_czy_uzytkownik_istnieje = false;
+            cout << "Podaj PESEL uzytkownika, ktorego dane chcesz zmienic: " << endl;
+            cin >> pesel;
+            cout << endl;
+            for (Uzytkownik& uzytkownik : biblioteka.get_uzytkownicy()) {
+                if (uzytkownik.get_pesel() == pesel) {
+                    flaga_czy_uzytkownik_istnieje = true;
+                    uzytkownik.edytuj_dane_uzytkownika();
+                }
+            }
+            if (!flaga_czy_uzytkownik_istnieje) {
+                cout << "Uzytkownik o podanym numerze PESEL nie istenieje w systemie." << endl;
+            }
             break;
-        case 5:
-            // Implementacja
+        }
+        case 5: {
+            string pesel = "";
+            bool flaga_czy_uzytkownik_istnieje = false;
+            cout << "Podaj PESEL uzytkownika, ktorego chcesz usunac z systemu: " << endl;
+            cin >> pesel;
+            cout << endl;
+            for (Uzytkownik& uzytkownik : biblioteka.get_uzytkownicy()) {
+                if (uzytkownik.get_pesel() == pesel) {
+                    flaga_czy_uzytkownik_istnieje = true;
+                    uzytkownik.usun_uzytkownika_z_systemu(uzytkownik);
+                }
+            }
+            if (!flaga_czy_uzytkownik_istnieje) {
+                cout << "Uzytkownik o podanym numerze PESEL nie istenieje w systemie." << endl;
+            }
             break;
-        case 6:
-            // Implementacja
+        }
+        case 6:{
+            string pesel = "";
+            bool flaga_czy_uzytkownik_istnieje = false;
+            cout << "Podaj PESEL uzytkownika, ktorego chcesz sprawdzic: " << endl;
+            cin >> pesel;
+            cout << endl;
+            for (Uzytkownik& uzytkownik : biblioteka.get_uzytkownicy()) {
+                if (uzytkownik.get_pesel() == pesel) {
+                    flaga_czy_uzytkownik_istnieje = true;
+                    uzytkownik.sprawdz_nieoplacone_grzywny();
+                }
+            }
+            if (!flaga_czy_uzytkownik_istnieje) {
+                cout << "Uzytkownik o podanym numerze PESEL nie istenieje w systemie." << endl;
+            }
             break;
+        }
         }
         break;
     }
@@ -440,7 +517,6 @@ int main()
         }
         break;
     }
-
     case 4: {
         int decyzja;
         cout << "Wybrales obszar: 'Ksiazka'." << endl;
@@ -481,7 +557,7 @@ int main()
                 //oto lista ksiazek o tym tytule
                 ///////////////////////////////////////
                 cout << "Książki o tytule \"" << tytul << "\":" << endl;
-                for (const Ksiazka& ksiazka : biblioteka.get_zbior_ksiazek()) {
+                for (Ksiazka& ksiazka : biblioteka.get_zbior_ksiazek()) {
                     if (ksiazka.get_tytul() == tytul) {
                         ksiazka.sprawdz_szczegoly_ksiazki();
                     }
