@@ -13,6 +13,16 @@ class Wypozyczenie;
 class Data;
 class Egzemplarz;
 
+
+// Enum do reprezentowania statusu książki
+enum class StatusKsiazki {
+    Dostepna,
+    Wypozyczona,
+    Zarezerwowana
+};
+
+
+
 class Data {
 private:
     int dzien;
@@ -355,21 +365,44 @@ private:
     vector<Egzemplarz> egzemplarze;
     Data data_wydania;
     string ISBN;
+    StatusKsiazki status;
+    Uzytkownik* zarezerwowal; // Deklaracja wskaźnika
 
 public:
+    // Konstruktor
     Ksiazka(Autor& a, string& t, string& g, Data& d, string isb) : autor(a), tytul(t), gatunek(g), data_wydania(d), ISBN(isb) {}
+
+    // Gettery
     Autor get_autor() { return autor; }
     string get_tytul() { return tytul; }
     string get_gatunek() { return gatunek; }
     Data get_data_wydania() { return data_wydania; }
     vector<Egzemplarz>& get_egzemplarze() { return egzemplarze; }
     string get_ISBN() { return ISBN; }
+    StatusKsiazki get_status() { return status; }
+    Uzytkownik* get_zarezerwowal() { return zarezerwowal; } // Getter dla wskaźnika
 
     // Settery
     void set_autor(Autor& au) { autor = au; }
     void set_tytul(string& t) { tytul = t; }
     void set_gatunek(string& gat) { gatunek = gat; }
     void set_data_wydania(Data& d) { data_wydania = d; }
+    void set_status(StatusKsiazki ss) { status = ss; }
+    void set_rezerwujacy(Uzytkownik* uzytkownik) { zarezerwowal = uzytkownik; } // Setter dla wskaźnika
+
+    void rezerwuj(Uzytkownik& uzytkownik) {
+        if (status == StatusKsiazki::Dostepna) {
+            status = StatusKsiazki::Zarezerwowana;
+            zarezerwowal = &uzytkownik;
+        }
+    }
+
+    void oddaj() {
+        status = StatusKsiazki::Dostepna;
+        zarezerwowal = nullptr;
+    }
+
+
 
     void dodaj_egzemplarz(Egzemplarz& e) { egzemplarze.push_back(e); }
     void usun_egzemplarz() { egzemplarze.pop_back(); }
@@ -459,6 +492,29 @@ public:
         int rok = p->tm_year + 1900;
         Wypozyczenie w(dzien, miesiac, rok, k, u);
         wypozyczenia.push_back(w);
+    }
+
+    bool czyDostepnaDoRezerwacji(const string& isbn) {
+        for (auto& ksiazka : ksiazki) {
+            if (ksiazka.get_ISBN() == isbn && ksiazka.get_status() == StatusKsiazki::Dostepna) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    void rezerwuj(string pesel) {
+        for (auto& wypozyczenie : wypozyczenia) {
+            Ksiazka& ksiazka = wypozyczenie.get_ksiazka();
+            if (wypozyczenie.get_uzytkownik().get_pesel() == pesel &&
+                ksiazka.get_status() == StatusKsiazki::Dostepna) {
+                ksiazka.rezerwuj(wypozyczenie.get_uzytkownik());
+                cout << "Sukces rezerwacji :)" << endl;
+                return; // return, aby zakończyć pętlę po zarezerwowaniu pierwszej dostępnej książki
+            }
+        }
+        // Jeśli nie znaleziono dostępnej książki do zarezerwowania
+        cout << "Nie znaleziono dostępnej książki do zarezerwowania dla użytkownika o podanym PESELu." << endl;
     }
 
     void wyswietl_wypozyczenia_uzytkownika(string id) {
@@ -552,7 +608,7 @@ int main()
     string email1 = "email1@example.com";
     string email2 = "email2@example.com";
     string pesel1 = "12345678901";
-    string pesel2 = "10987654321";
+    string pesel2 = "101";
 
     Uzytkownik uzytkownik1("Jan", "Kowalski", telefon1, email1, pesel1);
     Uzytkownik uzytkownik2("Anna", "Nowak", telefon2, email2, pesel2);
@@ -705,7 +761,14 @@ int main()
             }
 
         }
-        case 5: {}
+        case 5: {
+            string pesel;
+            cout << "Podaj PESEL użytkownika: ";
+            cin >> pesel;
+            biblioteka.rezerwuj(pesel); // Przekazanie PESELu do funkcji rezerwującej książkę
+            break;
+
+        }
 
         }
         break;
