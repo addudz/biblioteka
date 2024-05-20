@@ -5,6 +5,14 @@
 #include <ctime>
 using namespace std;
 
+// Deklaracja klas
+class Autor;
+class Ksiazka;
+class Uzytkownik;
+class Wypozyczenie;
+class Data;
+class Egzemplarz;
+
 class Data {
 private:
     int dzien;
@@ -12,6 +20,8 @@ private:
     int rok;
 public:
     Data(int d, int m, int r) : dzien(d), miesiac(m), rok(r) {}
+    Data() : dzien(0), miesiac(0), rok(0) {} // Domyślny konstruktor
+
     void wyswietl_date_wypozyczenia() { cout << "data wypozyczenia to: " << dzien << "." << miesiac << "." << rok << endl; }
     void wyswietl_date_zwrotu() {
         // Konwertowanie daty na strukturę tm
@@ -28,10 +38,39 @@ public:
         // Wyświetlenie daty zwrotu
         cout << "data zwrotu to: " << timeinfo.tm_mday << "." << timeinfo.tm_mon + 1 << "." << timeinfo.tm_year + 1900 << endl;
     }
+
     void wyswietl_date() { cout << "data: " << dzien << "." << miesiac << "." << rok << endl; }
 
     void set_data(int d, int m, int r) { dzien = d, miesiac = m, rok = r; }
+
+    int get_dzien() { return dzien; }
+    int get_miesiac() { return miesiac; }
+    int get_rok() { return rok; }
+
+
+    int days_between(const Data& other) {
+        tm time1 = { 0 };
+        time1.tm_mday = dzien;
+        time1.tm_mon = miesiac - 1;
+        time1.tm_year = rok - 1900;
+        mktime(&time1);
+
+        tm time2 = { 0 };
+        time2.tm_mday = other.dzien;
+        time2.tm_mon = other.miesiac - 1;
+        time2.tm_year = other.rok - 1900;
+        mktime(&time2);
+
+        double difference = difftime(mktime(&time2), mktime(&time1));
+        return static_cast<int>(difference / (60 * 60 * 24));
+    }
 };
+
+// Przeciążenie operatora << dla klasy Data
+ostream& operator<<(ostream& os, Data& dt) {
+    os << dt.get_dzien() << "-" << dt.get_miesiac() << "-" << dt.get_rok();
+    return os;
+}
 
 class Grzywny {
 private:
@@ -179,10 +218,14 @@ public:
         }
     }
 
+    bool operator==(Uzytkownik& other) {
+        return this->get_pesel() == other.get_pesel();
+    }
+
 };
 
 
-class Ksiazka;
+
 
 class Autor : public Osoba {
     vector<Ksiazka> ksiazki;
@@ -286,15 +329,22 @@ public:
 
 };
 
+
 class Egzemplarz {
 private:
     string wydanie;
     string ISBN;
+
+
 public:
-    Egzemplarz(string& w, string& i) : wydanie(w), ISBN(i) {}
+    Egzemplarz(string& w) : wydanie(w) {}
+    Egzemplarz(string& w, string& i) : wydanie(w), ISBN(i) {} // Konstruktor przyjmujący dwa argumenty
+
     string get_wydanie() { return wydanie; }
+
     string get_ISBN() { return ISBN; }
-    void set_egzemplarz(string w, string isb) { wydanie = w; ISBN = isb; }
+
+    void set_egzemplarz(string w, string is) { wydanie = w; ISBN = is; }
 };
 
 class Ksiazka {
@@ -304,14 +354,16 @@ private:
     string gatunek;
     vector<Egzemplarz> egzemplarze;
     Data data_wydania;
+    string ISBN;
 
 public:
-    Ksiazka(Autor& a, string& t, string& g, Data& d) : autor(a), tytul(t), gatunek(g), data_wydania(d) {}
+    Ksiazka(Autor& a, string& t, string& g, Data& d, string isb) : autor(a), tytul(t), gatunek(g), data_wydania(d), ISBN(isb) {}
     Autor get_autor() { return autor; }
     string get_tytul() { return tytul; }
     string get_gatunek() { return gatunek; }
     Data get_data_wydania() { return data_wydania; }
     vector<Egzemplarz>& get_egzemplarze() { return egzemplarze; }
+    string get_ISBN() { return ISBN; }
 
     // Settery
     void set_autor(Autor& au) { autor = au; }
@@ -327,7 +379,7 @@ public:
         cout << "Tytul: " << tytul << endl
             << "Autor: " << autor.get_imie() << " " << autor.get_nazwisko() << endl
             << "Gatunek: " << gatunek << endl
-            << "Data wydania: ";
+            << "Data wydania: " << "ISBN: " << get_ISBN() << endl;
         data_wydania.wyswietl_date();
         cout << "Egzemplarze: " << egzemplarze.size() << endl;
     }
@@ -342,34 +394,179 @@ public:
         }
         return false;
     }
+    bool czy_ma_isbn(string& isbn) {
+        // Iterujemy przez wszystkie egzemplarze książki i sprawdzamy, czy któryś ma podany numer ISBN
+        for (auto& egzemplarz : egzemplarze) {
+            if (egzemplarz.get_ISBN() == isbn) {
+                return true; // Zwracamy true, jeśli znaleziono egzemplarz o podanym ISBN
+            }
+        }
+        return false; // Zwracamy false, jeśli nie znaleziono egzemplarza o podanym ISBN
+    }
+};
+
+class Wypozyczenie : public Data {
+private:
+    Data data_wypozyczenia;
+    Ksiazka& ksiazka;
+    Uzytkownik& uzytkownik;
+public:
+    //Wypozyczenie(int d, int m, int r, Ksiazka& k, Uzytkownik& u) : Data(d, m, r), ksiazka(k), uzytkownik(u) {}
+    Wypozyczenie(int d, int m, int r, Ksiazka& k, Uzytkownik& u)
+        : data_wypozyczenia(d, m, r), ksiazka(k), uzytkownik(u) {}
+
+    Wypozyczenie(Ksiazka& k, Uzytkownik& u)
+        : data_wypozyczenia(), ksiazka(k), uzytkownik(u) {}
+
+    Wypozyczenie(const Wypozyczenie& other)
+        : Data(other), data_wypozyczenia(other.data_wypozyczenia), ksiazka(other.ksiazka), uzytkownik(other.uzytkownik) {}
+
+    Wypozyczenie& operator=(const Wypozyczenie& other) {
+        if (this != &other) {
+            Data::operator=(other);
+            data_wypozyczenia = other.data_wypozyczenia;
+            // Nie możemy zmienić referencji, więc nie trzeba kopiować ksiazka i uzytkownik
+        }
+        return *this;
+    }
+
+    Data& get_data_wypozyczenia() { return data_wypozyczenia; }
+    Ksiazka& get_ksiazka() { return ksiazka; }
+    Uzytkownik& get_uzytkownik() { return uzytkownik; }
+
+    void wyswietl() {
+        cout << "Wypożyczenie: " << data_wypozyczenia << ", Książka: "
+            << ksiazka.get_tytul() << ", Użytkownik: " << uzytkownik.get_imie()
+            << " " << uzytkownik.get_nazwisko() << endl;
+    }
+};
+
+
+class Biblioteka {
+private:
+    vector<Ksiazka> ksiazki;
+    vector<Uzytkownik> uzytkownicy;
+    vector<Wypozyczenie> wypozyczenia;
+
+public:
+    void dodaj_ksiazke(Ksiazka k) { ksiazki.push_back(k); }
+    void dodaj_uzytkownika(Uzytkownik u) { uzytkownicy.push_back(u); }
+    void wypozycz(Ksiazka& k, Uzytkownik& u) {
+        time_t now = time(nullptr);
+        tm* p = localtime(&now);
+        int dzien = p->tm_mday;
+        int miesiac = p->tm_mon + 1;
+        int rok = p->tm_year + 1900;
+        Wypozyczenie w(dzien, miesiac, rok, k, u);
+        wypozyczenia.push_back(w);
+    }
+
+    void wyswietl_wypozyczenia_uzytkownika(string id) {
+        for (auto& wyp : wypozyczenia) {
+            if (wyp.get_uzytkownik().get_pesel() == id) {
+                cout << "Książka: " << wyp.get_ksiazka().get_tytul() << ", Termin zwrotu: ";
+                wyp.get_data_wypozyczenia().wyswietl_date_zwrotu();
+            }
+        }
+    }
+
+    bool czy_uzytkownik_wypozyczyl_ksiazke(string& isbn, Uzytkownik& uzytkownik) {
+        for (auto& wypozyczenie : wypozyczenia) {
+            if (wypozyczenie.get_ksiazka().czy_ma_isbn(isbn) && wypozyczenie.get_uzytkownik() == uzytkownik) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    void wyswietl_wypozyczenia_uzytkownika(string& isbn, Uzytkownik& uzytkownik) {
+        // Przeszukaj wypożyczenia użytkownika i wyświetl te z podanym numerem ISBN
+        for (auto& wypozyczenie : wypozyczenia) {
+            if (wypozyczenie.get_ksiazka().czy_ma_isbn(isbn) && wypozyczenie.get_uzytkownik() == uzytkownik) {
+                wypozyczenie.wyswietl(); // Wyświetl wypożyczenie
+            }
+        }
+    }
 };
 
 int main()
 {
     //POMOCNICZE WYSWIETLENIA SPRAWDZAJACE POPRAWNOSC KODU
-    /*Data data1(10, 5, 2007);
-    data1.wyswietl_date_wypozyczenia();
-    data1.wyswietl_date_zwrotu();
+    //Data data1(10, 5, 2007);
+   // data1.wyswietl_date_wypozyczenia();
+    //data1.wyswietl_date_zwrotu();
+    Biblioteka biblioteka;
 
-    cout <<endl<< "Wszyscy uzytkownicy w bazie: " << endl;
-    Uzytkownik uzytkownik1("Jan", "Kowalski", 123456789, "jan.kowalski@example.com", "1234567890");
-    Uzytkownik uzytkownik2("Julia", "Nowak", 123456789, "julia.nowak@example.com", "1256789655");
-    Uzytkownik uzytkownik3("Monika", "Walczyk", 123456789, "monika.walczyk@example.com", "1234897810");
-    uzytkownik1.wyswietl_uzytkownika();
-    uzytkownik2.wyswietl_uzytkownika();
-    uzytkownik3.wyswietl_uzytkownika();
+    cout << endl << "Wszyscy uzytkownicy w bazie: " << endl;
+    // Tworzenie przykładowych autorów
+    Autor autor1("Adam", "Mickiewicz");
+    Autor autor2("Henryk", "Sienkiewicz");
+    Autor autor3("Juliusz", "Slowacki");
+    Autor autor4("Maria", "Konopnicka");
+    Autor autor5("Boleslaw", "Prus");
+    Autor autor6("C++", "Programista");
 
-    */
-    vector<Autor> autorzy;
-    vector<Uzytkownik> uzytkownicy;
-    vector<Ksiazka> ksiazki;
-    // Dodanie kilku użytkowników do wektora
-    uzytkownicy.push_back(Uzytkownik("Jan", "Kowalski", 123456789, "jan@kowalski.com", "12345678901"));
-    uzytkownicy.push_back(Uzytkownik("Anna", "Nowak", 987654321, "anna@nowak.com", "98765432109"));
-    uzytkownicy.push_back(Uzytkownik("A", "N", 1, "an@nk.com", "1"));
-    // Przykładowe dodanie autorów do wektora
-    autorzy.push_back(Autor("olga", "tokar"));
-    autorzy.push_back(Autor("piotr", "malanowski"));
+    // Tworzenie przykładowych książek
+    Data data_wydania1(1, 1, 2000);
+    Data data_wydania2(2, 2, 2001);
+    Data data_wydania3(3, 3, 2002);
+    Data data_wydania4(4, 4, 2003);
+    Data data_wydania5(5, 5, 2004);
+    Data data_wydania6(6, 6, 2005);
+
+    string tytul1 = "Pan Tadeusz";
+    string gatunek1 = "Epika";
+    string tytul2 = "Krzyzacy";
+    string gatunek2 = "Historia";
+    string tytul3 = "Balladyna";
+    string gatunek3 = "Dramat";
+    string tytul4 = "Rota";
+    string gatunek4 = "Poezja";
+    string tytul5 = "Lalka";
+    string gatunek5 = "Powieść";
+    string tytul6 = "C++ dla początkujących";
+    string gatunek6 = "Programowanie";
+
+    Ksiazka ksiazka1(autor1, tytul1, gatunek1, data_wydania1, "1234G");
+    Ksiazka ksiazka2(autor2, tytul2, gatunek2, data_wydania2, "AAA34");
+    Ksiazka ksiazka3(autor3, tytul3, gatunek3, data_wydania3, "5555T");
+    Ksiazka ksiazka4(autor4, tytul4, gatunek4, data_wydania4, "6666K");
+    Ksiazka ksiazka5(autor5, tytul5, gatunek5, data_wydania5, "8888J");
+    Ksiazka ksiazka6(autor6, tytul6, gatunek6, data_wydania6, "7777H");
+
+    // Tworzenie przykładowych egzemplarzy
+    string wydanie = "1st Edition";
+    string isbn1 = "978-3-16-148410-0";
+    string isbn2 = "978-3-16-148411-7";
+
+    Egzemplarz egzemplarz1(wydanie, isbn1);
+    Egzemplarz egzemplarz2(wydanie, isbn2);
+
+    // Dodawanie egzemplarzy do książek
+    ksiazka1.dodaj_egzemplarz(egzemplarz1);
+    ksiazka2.dodaj_egzemplarz(egzemplarz2);
+
+    // Tworzenie użytkowników
+    int telefon1 = 123456789;
+    int telefon2 = 987654321;
+    string email1 = "email1@example.com";
+    string email2 = "email2@example.com";
+    string pesel1 = "12345678901";
+    string pesel2 = "10987654321";
+
+    Uzytkownik uzytkownik1("Jan", "Kowalski", telefon1, email1, pesel1);
+    Uzytkownik uzytkownik2("Anna", "Nowak", telefon2, email2, pesel2);
+
+    // Tworzenie wypożyczeń
+    Wypozyczenie wypozyczenie1(1, 1, 2023, ksiazka1, uzytkownik1);
+    Wypozyczenie wypozyczenie2(2, 2, 2023, ksiazka2, uzytkownik2);
+
+    // Tworzenie wektorów książek, autorów i użytkowników
+    vector<Ksiazka> ksiazki = { ksiazka1, ksiazka2, ksiazka3, ksiazka4, ksiazka5, ksiazka6 };
+    vector<Autor> autorzy = { autor1, autor2, autor3, autor4, autor5, autor6 };
+    vector<Uzytkownik> uzytkownicy = { uzytkownik1, uzytkownik2 };
+    vector<Wypozyczenie> wypozyczenia = { wypozyczenie1, wypozyczenie2 };
+
 
     //------------------------SYSTEM BIBLIOTECZNY----------------------------------------------------------
     int wybor;
@@ -385,9 +582,134 @@ int main()
     cin >> wybor;
 
     switch (wybor) {
-    case 1:
-        break;
+    case 1: {
+        int decyzja;
+        cout << "Wybrales obszar: 'Wypozyczenie/Zwrot'." << endl;
+        cout << "Dokonaj wyboru konkretnej operacji z ponizszych dozwolonych: " << endl;
+        cout << "1. sprawdz wypozyczenie danej ksiazki przez isbn" << endl;
+        cout << "2. rozpocznij wypozyczenie danej ksiazki" << endl;
+        cout << "3. zakoncz wypozyczenie danej ksiazki" << endl;
+        cout << "4. sprawdz termin do kiedy ksiazka powinna zostac oddana" << endl;
+        cout << "5. zarezerwuj ksiazke" << endl;
+        cout << "Twój wybór: ";
+        cin >> decyzja;
+        cout << endl;
+        switch (decyzja) {
+        case 1: {
+            string isbn;
+            cout << "Podaj numer ISBN: ";
+            cin >> isbn;
 
+            bool found = false;
+            for (auto& wyp : wypozyczenia) {
+                for (auto& egz : wyp.get_ksiazka().get_egzemplarze()) {
+                    if (egz.get_ISBN() == isbn) {
+                        cout << "Książka o ISBN " << isbn << " jest wypożyczona przez użytkownika: "
+                            << wyp.get_uzytkownik().get_imie() << " " << wyp.get_uzytkownik().get_nazwisko()
+                            << " (PESEL: " << wyp.get_uzytkownik().get_pesel() << ")" << endl;
+                        found = true;
+                        break;
+                    }
+                }
+                if (found) break;
+            }
+            if (!found) {
+                cout << "Nie znaleziono wypożyczenia dla podanego numeru ISBN." << endl;
+            }
+            break;
+        }
+        case 2: {
+
+            string isbn, pesel;
+            cout << "Podaj ISBN książki do wypożyczenia: ";
+            cin >> isbn;
+            cout << "Podaj PESEL użytkownika: ";
+            cin >> pesel;
+
+            Ksiazka* ksiazka_do_wypozyczenia = nullptr;
+            Uzytkownik* uzytkownik_wypozyczajacy = nullptr;
+
+            for (auto& ks : ksiazki) {
+                for (auto& egz : ks.get_egzemplarze()) {
+                    if (egz.get_ISBN() == isbn) {
+                        ksiazka_do_wypozyczenia = &ks;
+                        break;
+                    }
+                }
+                if (ksiazka_do_wypozyczenia) break;
+            }
+
+            for (auto& uz : uzytkownicy) {
+                if (uz.get_pesel() == pesel) {
+                    uzytkownik_wypozyczajacy = &uz;
+                    break;
+                }
+            }
+
+            if (ksiazka_do_wypozyczenia && uzytkownik_wypozyczajacy) {
+                Wypozyczenie nowe_wypozyczenie(20, 5, 2024, *ksiazka_do_wypozyczenia, *uzytkownik_wypozyczajacy);
+                wypozyczenia.push_back(nowe_wypozyczenie);
+                cout << "Wypożyczono książkę!" << endl;
+            }
+            else {
+                cout << "Nie znaleziono książki lub użytkownika." << endl;
+            }
+            break;
+        }
+        case 3: {
+            string isbn, pesel;
+            cout << "Podaj ISBN książki do zwrotu: ";
+            cin >> isbn;
+            cout << "Podaj PESEL użytkownika: ";
+            cin >> pesel;
+
+            auto it = std::find_if(wypozyczenia.begin(), wypozyczenia.end(),
+                [&](Wypozyczenie& w) {
+                    return w.get_ksiazka().get_ISBN() == isbn && w.get_uzytkownik().get_pesel() == pesel;
+                });
+
+            if (it != wypozyczenia.end()) {
+                // Sprawdzenie terminu zwrotu
+                time_t now = time(0);
+                tm* ltm = localtime(&now);
+                Data dzisiaj(ltm->tm_mday, 1 + ltm->tm_mon, 1900 + ltm->tm_year);
+
+                // Zakładamy, że masz funkcję w Data do obliczenia różnicy w dniach
+                int dni_wypozyczenia = it->get_data_wypozyczenia().days_between(dzisiaj);
+
+                if (dni_wypozyczenia > 30) {
+                    cout << "Opóźniony termin zwrotu!" << endl;
+                }
+
+                wypozyczenia.erase(it);
+                cout << "Wypożyczenie zakończone." << endl;
+            }
+            else {
+                cout << "Nie znaleziono wypożyczenia." << endl;
+            }
+            break;
+        }
+        case 4: {
+
+            string isbn;
+            cout << "Podaj numer ISBN: ";
+            cin >> isbn;
+
+            // Wyświetlamy wypożyczone książki dla użytkownika na podstawie numeru ISBN
+            // Wyszukaj użytkownika w wektorze na podstawie numeru ISBN
+            for (auto& uzytkownik : uzytkownicy) {
+                if (biblioteka.czy_uzytkownik_wypozyczyl_ksiazke(isbn, uzytkownik)) {
+                    biblioteka.wyswietl_wypozyczenia_uzytkownika(isbn, uzytkownik);
+                    break;  // Jeśli znaleziono użytkownika, można przerwać pętlę
+                }
+            }
+
+        }
+        case 5: {}
+
+        }
+        break;
+    }
     case 2:
         int decyzja;
         cout << endl << "Wybrales obszar: 'Uzytkownik'." << endl;
@@ -701,7 +1023,10 @@ int main()
                     cin >> dzien >> miesiac >> rok;
                     Data data_wydania(dzien, miesiac, rok);
 
-                    Ksiazka nowa_ksiazka(autor, tytul, gatunek, data_wydania);
+                    cout << "podaj ISBN: ";
+                    string isbn;
+                    cin >> isbn;
+                    Ksiazka nowa_ksiazka(autor, tytul, gatunek, data_wydania, isbn);
                     a.dodaj_ksiazke(nowa_ksiazka);
                     znaleziono_autora = true;
                     break;
