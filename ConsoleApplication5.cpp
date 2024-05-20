@@ -1,4 +1,5 @@
-﻿#include <iostream>
+﻿#define _CRT_SECURE_NO_WARNINGS
+#include <iostream>
 #include <string>
 #include <vector>
 #include <algorithm>
@@ -12,6 +13,16 @@ class Uzytkownik;
 class Wypozyczenie;
 class Data;
 class Egzemplarz;
+
+
+// Enum do reprezentowania statusu książki
+enum class StatusKsiazki {
+    Dostepna,
+    Wypozyczona,
+    Zarezerwowana
+};
+
+
 
 class Data {
 private:
@@ -355,21 +366,44 @@ private:
     vector<Egzemplarz> egzemplarze;
     Data data_wydania;
     string ISBN;
+    StatusKsiazki status;
+    Uzytkownik* zarezerwowal; // Deklaracja wskaźnika
 
 public:
+    // Konstruktor
     Ksiazka(Autor& a, string& t, string& g, Data& d, string isb) : autor(a), tytul(t), gatunek(g), data_wydania(d), ISBN(isb) {}
+
+    // Gettery
     Autor get_autor() { return autor; }
     string get_tytul() { return tytul; }
     string get_gatunek() { return gatunek; }
     Data get_data_wydania() { return data_wydania; }
     vector<Egzemplarz>& get_egzemplarze() { return egzemplarze; }
     string get_ISBN() { return ISBN; }
+    StatusKsiazki get_status() { return status; }
+    Uzytkownik* get_zarezerwowal() { return zarezerwowal; } // Getter dla wskaźnika
 
     // Settery
     void set_autor(Autor& au) { autor = au; }
     void set_tytul(string& t) { tytul = t; }
     void set_gatunek(string& gat) { gatunek = gat; }
     void set_data_wydania(Data& d) { data_wydania = d; }
+    void set_status(StatusKsiazki ss) { status = ss; }
+    void set_rezerwujacy(Uzytkownik* uzytkownik) { zarezerwowal = uzytkownik; } // Setter dla wskaźnika
+
+    void rezerwuj(Uzytkownik& uzytkownik) {
+        if (status == StatusKsiazki::Dostepna) {
+            status = StatusKsiazki::Zarezerwowana;
+            zarezerwowal = &uzytkownik;
+        }
+    }
+
+    void oddaj() {
+        status = StatusKsiazki::Dostepna;
+        zarezerwowal = nullptr;
+    }
+
+
 
     void dodaj_egzemplarz(Egzemplarz& e) { egzemplarze.push_back(e); }
     void usun_egzemplarz() { egzemplarze.pop_back(); }
@@ -461,6 +495,29 @@ public:
         wypozyczenia.push_back(w);
     }
 
+    bool czyDostepnaDoRezerwacji(const string& isbn) {
+        for (auto& ksiazka : ksiazki) {
+            if (ksiazka.get_ISBN() == isbn && ksiazka.get_status() == StatusKsiazki::Dostepna) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    void rezerwuj(string pesel) {
+        for (auto& wypozyczenie : wypozyczenia) {
+            Ksiazka& ksiazka = wypozyczenie.get_ksiazka();
+            if (wypozyczenie.get_uzytkownik().get_pesel() == pesel &&
+                ksiazka.get_status() == StatusKsiazki::Dostepna) {
+                ksiazka.rezerwuj(wypozyczenie.get_uzytkownik());
+                cout << "Sukces rezerwacji :)" << endl;
+                return; // return, aby zakończyć pętlę po zarezerwowaniu pierwszej dostępnej książki
+            }
+        }
+        // Jeśli nie znaleziono dostępnej książki do zarezerwowania
+        cout << "Nie znaleziono dostępnej książki do zarezerwowania dla użytkownika o podanym PESELu." << endl;
+    }
+
     void wyswietl_wypozyczenia_uzytkownika(string id) {
         for (auto& wyp : wypozyczenia) {
             if (wyp.get_uzytkownik().get_pesel() == id) {
@@ -489,15 +546,766 @@ public:
     }
 };
 
+
+Biblioteka biblioteka;
+
+// Deklaracja wektorów książek, autorów i użytkowników
+
+vector<Ksiazka> ksiazki;
+vector<Autor> autorzy;
+vector<Uzytkownik> uzytkownicy;
+vector<Wypozyczenie> wypozyczenia;
+
+//funkcje do obslugi menu
+
+void system_biblioteczny();
+
+void case_1_1() {
+    system("cls");
+    cout << "Wybrales obszar: sprawdz wypozyczenie danej ksiazki przez isbn" << endl;
+    string isbn;
+    cout << "Podaj numer ISBN: ";
+    cin >> isbn;
+
+    bool found = false;
+    for (auto& wyp : wypozyczenia) {
+        for (auto& egz : wyp.get_ksiazka().get_egzemplarze()) {
+            if (egz.get_ISBN() == isbn) {
+                cout << "Książka o ISBN " << isbn << " jest wypożyczona przez użytkownika: "
+                    << wyp.get_uzytkownik().get_imie() << " " << wyp.get_uzytkownik().get_nazwisko()
+                    << " (PESEL: " << wyp.get_uzytkownik().get_pesel() << ")" << endl;
+                found = true;
+                break;
+            }
+        }
+        if (found) break;
+    }
+    if (!found) {
+        cout << "Nie znaleziono wypożyczenia dla podanego numeru ISBN." << endl;
+    }
+
+    cout << endl;
+    char powrot_do_menu_glownego;
+    cout << "Jesli chcesz wrocic do menu glownego, wcisnij 'm'', jesli chcesz wyjsc, wcisnij dowolny klawisz." << endl;
+    cin >> powrot_do_menu_glownego; 
+    if (powrot_do_menu_glownego == 'm') system_biblioteczny();
+}
+
+void case_1_2() {
+    system("cls");
+    cout << "Wybrales obszar: rozpocznij wypozyczenie danej ksiazki" << endl;
+    string isbn, pesel;
+    cout << "Podaj ISBN książki do wypożyczenia: ";
+    cin >> isbn;
+    cout << "Podaj PESEL użytkownika: ";
+    cin >> pesel;
+
+    Ksiazka* ksiazka_do_wypozyczenia = nullptr;
+    Uzytkownik* uzytkownik_wypozyczajacy = nullptr;
+
+    for (auto& ks : ksiazki) {
+        for (auto& egz : ks.get_egzemplarze()) {
+            if (egz.get_ISBN() == isbn) {
+                ksiazka_do_wypozyczenia = &ks;
+                break;
+            }
+        }
+        if (ksiazka_do_wypozyczenia) break;
+    }
+
+    for (auto& uz : uzytkownicy) {
+        if (uz.get_pesel() == pesel) {
+            uzytkownik_wypozyczajacy = &uz;
+            break;
+        }
+    }
+
+    if (ksiazka_do_wypozyczenia && uzytkownik_wypozyczajacy) {
+        Wypozyczenie nowe_wypozyczenie(20, 5, 2024, *ksiazka_do_wypozyczenia, *uzytkownik_wypozyczajacy);
+        wypozyczenia.push_back(nowe_wypozyczenie);
+        cout << "Wypożyczono książkę!" << endl;
+    }
+    else {
+        cout << "Nie znaleziono książki lub użytkownika." << endl;
+    }
+
+    cout << endl;
+    char powrot_do_menu_glownego;
+    cout << "Jesli chcesz wrocic do menu glownego, wcisnij 'm'', jesli chcesz wyjsc, wcisnij dowolny klawisz." << endl;
+    cin >> powrot_do_menu_glownego;
+    if (powrot_do_menu_glownego == 'm') system_biblioteczny();
+}
+
+void case_1_3() {
+    system("cls");
+    cout << "Wybrales obszar: zakoncz wypozyczenie danej ksiazki" << endl;
+    string isbn, pesel;
+    cout << "Podaj ISBN książki do zwrotu: ";
+    cin >> isbn;
+    cout << "Podaj PESEL użytkownika: ";
+    cin >> pesel;
+
+    auto it = std::find_if(wypozyczenia.begin(), wypozyczenia.end(),
+        [&](Wypozyczenie& w) {
+            return w.get_ksiazka().get_ISBN() == isbn && w.get_uzytkownik().get_pesel() == pesel;
+        });
+
+    if (it != wypozyczenia.end()) {
+        // Sprawdzenie terminu zwrotu
+        time_t now = time(0);
+        tm* ltm = localtime(&now);
+        Data dzisiaj(ltm->tm_mday, 1 + ltm->tm_mon, 1900 + ltm->tm_year);
+
+        // Zakładamy, że masz funkcję w Data do obliczenia różnicy w dniach
+        int dni_wypozyczenia = it->get_data_wypozyczenia().days_between(dzisiaj);
+
+        if (dni_wypozyczenia > 30) {
+            cout << "Opóźniony termin zwrotu!" << endl;
+        }
+
+        wypozyczenia.erase(it);
+        cout << "Wypożyczenie zakończone." << endl;
+    }
+    else {
+        cout << "Nie znaleziono wypożyczenia." << endl;
+    }
+    cout << endl;
+    char powrot_do_menu_glownego;
+    cout << "Jesli chcesz wrocic do menu glownego, wcisnij 'm'', jesli chcesz wyjsc, wcisnij dowolny klawisz." << endl;
+    cin >> powrot_do_menu_glownego;
+    if (powrot_do_menu_glownego == 'm') system_biblioteczny();
+}
+
+void case_1_4() {
+    system("cls");
+    cout << "Wybrales obszar: sprawdz termin do kiedy ksiazka powinna zostac oddana" << endl;
+    string isbn;
+    cout << "Podaj numer ISBN: ";
+    cin >> isbn;
+
+    // Wyświetlamy wypożyczone książki dla użytkownika na podstawie numeru ISBN
+    // Wyszukaj użytkownika w wektorze na podstawie numeru ISBN
+    for (auto& uzytkownik : uzytkownicy) {
+        if (biblioteka.czy_uzytkownik_wypozyczyl_ksiazke(isbn, uzytkownik)) {
+            biblioteka.wyswietl_wypozyczenia_uzytkownika(isbn, uzytkownik);
+            break;  // Jeśli znaleziono użytkownika, można przerwać pętlę
+        }
+    }
+    cout << endl;
+    char powrot_do_menu_glownego;
+    cout << "Jesli chcesz wrocic do menu glownego, wcisnij 'm'', jesli chcesz wyjsc, wcisnij dowolny klawisz." << endl;
+    cin >> powrot_do_menu_glownego;
+    if (powrot_do_menu_glownego == 'm') system_biblioteczny();
+}
+
+void case_1_5() {
+    system("cls");
+    cout << "Wybrales obszar: zarezerwuj ksiazke" << endl;
+    string pesel;
+    cout << "Podaj PESEL użytkownika: ";
+    cin >> pesel;
+    biblioteka.rezerwuj(pesel); // Przekazanie PESELu do funkcji rezerwującej książkę
+    cout << endl;
+    char powrot_do_menu_glownego;
+    cout << "Jesli chcesz wrocic do menu glownego, wcisnij 'm'', jesli chcesz wyjsc, wcisnij dowolny klawisz." << endl;
+    cin >> powrot_do_menu_glownego;
+    if (powrot_do_menu_glownego == 'm') system_biblioteczny();
+}
+
+void case_1() {
+    system("cls");
+    int decyzja;
+    cout << "Wybrales obszar: 'Wypozyczenie/Zwrot'." << endl;
+    cout << "Dokonaj wyboru konkretnej operacji z ponizszych dozwolonych: " << endl;
+    cout << "1. sprawdz wypozyczenie danej ksiazki przez isbn" << endl;
+    cout << "2. rozpocznij wypozyczenie danej ksiazki" << endl;
+    cout << "3. zakoncz wypozyczenie danej ksiazki" << endl;
+    cout << "4. sprawdz termin do kiedy ksiazka powinna zostac oddana" << endl;
+    cout << "5. zarezerwuj ksiazke" << endl;
+    cout << "6. powrot do menu glownego" << endl;
+    cout << "Twój wybór: ";
+    cin >> decyzja;
+    cout << endl;
+    switch (decyzja) {
+    case 1: {
+        case_1_1();
+        break;
+    }
+    case 2: {
+        case_1_2();
+        break;
+    }
+    case 3: {
+        case_1_3();
+        break;
+    }
+    case 4: {
+        case_1_4();
+        break;
+    }
+    case 5: {
+        case_1_5();
+        break;
+    }
+    case 6: {
+        system_biblioteczny();
+        break;
+    }
+    default: {
+        cout << "Niepoprawny wybór." << endl;
+        break;
+    }
+    }  
+}
+
+void case_2_1() {
+    system("cls");
+    cout << "Wybrales obszar: sprawdz dane uzytkownika " << endl;
+    cout << "podaj pesel uzytkownika do wyswietlenia jego danych: ";
+    string pesel1;
+    cin >> pesel1;
+
+    bool znaleziono = false;
+    for (auto& uzytkownik : uzytkownicy) {
+        if (uzytkownik.czy_pesel_w_systemie(pesel1)) {
+            znaleziono = true;
+            uzytkownik.wyswietl_uzytkownika();
+            break;
+        }
+    }
+
+    if (!znaleziono) {
+        cout << "Brak uzytkownika o podanym PESELu." << endl;
+    }
+    cout << endl;
+    char powrot_do_menu_glownego;
+    cout << "Jesli chcesz wrocic do menu glownego, wcisnij 'm'', jesli chcesz wyjsc, wcisnij dowolny klawisz." << endl;
+    cin >> powrot_do_menu_glownego;
+    if (powrot_do_menu_glownego == 'm') system_biblioteczny();
+}
+
+void case_2_2() {
+    system("cls");
+    cout << "Wybrales obszar: sprawdz czy taki pesel jest juz w systemie " << endl;
+    string pesel2;
+    cout << "podaj pesel uzytkownika do sprawdzenia czy jest w systemie: ";
+    cin >> pesel2;
+    // Sprawdzenie czy użytkownik o podanym PESELu istnieje
+    bool znaleziono = false;
+    for (auto& uzytkownik : uzytkownicy) {
+        if (uzytkownik.czy_pesel_w_systemie(pesel2)) {
+            znaleziono = true;
+            cout << "uzytkownik o podanym peselu istnieje :) " << endl;
+
+            break;
+        }
+    }
+
+    if (!znaleziono) {
+        cout << "Brak uzytkownika o podanym PESELu." << endl;
+    }
+    cout << endl;
+    char powrot_do_menu_glownego;
+    cout << "Jesli chcesz wrocic do menu glownego, wcisnij 'm'', jesli chcesz wyjsc, wcisnij dowolny klawisz." << endl;
+    cin >> powrot_do_menu_glownego;
+    if (powrot_do_menu_glownego == 'm') system_biblioteczny();
+}
+
+void case_2_3() {
+    system("cls");
+    cout << "Wybrales obszar: dodaj uzytkownika " << endl;
+    cout << "podaj pesel uzytkownika aby go dodac do systemu: ";
+    string pesel3;
+    cin >> pesel3;
+    // Sprawdzenie czy użytkownik o podanym PESELu istnieje
+    bool znaleziono = false;
+    for (auto& uzytkownik : uzytkownicy) {
+        if (uzytkownik.czy_pesel_w_systemie(pesel3)) {
+            znaleziono = true;
+            cout << "UWAGA! Taki pesel juz jest w bazie!" << endl;
+            uzytkownik.wyswietl_uzytkownika();
+            break;
+        }
+    }
+
+    if (!znaleziono) {
+        cout << "Brak uzytkownika o podanym PESELu. Mozna dodac do bazy :)" << endl;
+        cout << "Zaczynamy!" << endl;
+        Uzytkownik nowy_uzytkownik;
+        nowy_uzytkownik.Uzytkownik::dodaj_uzytkownika();
+        uzytkownicy.push_back(nowy_uzytkownik);
+        cout << "Nowy użytkownik został dodany do systemu." << endl;
+
+    }
+    cout << endl;
+    char powrot_do_menu_glownego;
+    cout << "Jesli chcesz wrocic do menu glownego, wcisnij 'm'', jesli chcesz wyjsc, wcisnij dowolny klawisz." << endl;
+    cin >> powrot_do_menu_glownego;
+    if (powrot_do_menu_glownego == 'm') system_biblioteczny();
+}
+
+void case_2_4() {
+    system("cls");
+    cout << "Wybrales segment edycji danych uzytkownika. " << endl;
+    cout << "podaj pesel uzytkownika do edycji jego danych: ";
+    string pesel4;
+    cin >> pesel4;
+    // Sprawdzenie czy użytkownik o podanym PESELu istnieje
+    //jesli tak to edycja jego danych dozwolona
+    bool znaleziono = false;
+    for (auto& uzytkownik : uzytkownicy) {
+        if (uzytkownik.czy_pesel_w_systemie(pesel4)) {
+            znaleziono = true;
+            uzytkownik.edytuj_dane_uzytkownika();
+            break;
+        }
+    }
+
+    if (!znaleziono) {
+        cout << "Brak uzytkownika o podanym PESELu. Nie mozna edytowac." << endl;
+    }
+    cout << endl;
+    char powrot_do_menu_glownego;
+    cout << "Jesli chcesz wrocic do menu glownego, wcisnij 'm'', jesli chcesz wyjsc, wcisnij dowolny klawisz." << endl;
+    cin >> powrot_do_menu_glownego;
+    if (powrot_do_menu_glownego == 'm') system_biblioteczny();
+}
+
+void case_2_5() {
+    system("cls");
+    cout << "Wybrales obszar: usun uzytkownika z systemu" << endl;
+    cout << "podaj pesel uzytkownika do usuniecia go z systemu: ";
+    string pesel5;
+    cin >> pesel5;
+
+    bool znaleziono = false;
+    auto it = uzytkownicy.begin();
+    while (it != uzytkownicy.end()) {
+        if (it->czy_pesel_w_systemie(pesel5)) {
+            znaleziono = true;
+            cout << "Użytkownik o podanym PESELu znaleziony. Usuwanie użytkownika..." << endl;
+            it = uzytkownicy.erase(it); // Usuń użytkownika z wektora
+            cout << "Użytkownik został usunięty z systemu." << endl;
+            break; // Przerywamy pętlę, bo użytkownik został znaleziony i usunięty
+        }
+        else {
+            ++it;
+        }
+    }
+
+    if (!znaleziono) {
+        cout << "Brak uzytkownika o podanym PESELu." << endl;
+    }
+    cout << endl;
+    char powrot_do_menu_glownego;
+    cout << "Jesli chcesz wrocic do menu glownego, wcisnij 'm'', jesli chcesz wyjsc, wcisnij dowolny klawisz." << endl;
+    cin >> powrot_do_menu_glownego;
+    if (powrot_do_menu_glownego == 'm') system_biblioteczny();
+}
+
+void case_2_6() {
+    system("cls");
+    cout << "Wybrales obszar: sprawdz czy uzytkownik ma nieoplacone grzywny" << endl;
+    string pesel;
+    cout << "Podaj PESEL użytkownika: ";
+    cin >> pesel;
+
+    // Szukamy użytkownika o podanym PESELu
+    auto it = find_if(uzytkownicy.begin(), uzytkownicy.end(), [&](Uzytkownik& u) {
+        return u.get_pesel() == pesel;
+        });
+
+    if (it != uzytkownicy.end()) { // Jeśli użytkownik został znaleziony
+        if (it->czy_ma_nieoplacone_grzywny()) {
+            cout << "Użytkownik ma nieopłacone grzywny." << endl;
+            it->wyswietl_grzywny();
+        }
+        else {
+            cout << "Użytkownik nie ma nieopłaconych grzywn." << endl;
+        }
+    }
+    else { // Jeśli użytkownik o podanym PESELu nie został znaleziony
+        cout << "Użytkownik o podanym PESELu nie istnieje." << endl;
+    }
+    cout << endl;
+    char powrot_do_menu_glownego;
+    cout << "Jesli chcesz wrocic do menu glownego, wcisnij 'm'', jesli chcesz wyjsc, wcisnij dowolny klawisz." << endl;
+    cin >> powrot_do_menu_glownego;
+    if (powrot_do_menu_glownego == 'm') system_biblioteczny();
+}
+
+void case_2_7() {
+    system("cls");
+    cout << "Wybrales obszar: dodaj grzywne do uzytkownika. " << endl;
+    string pesel;
+    float kwota;
+    string powod;
+
+    cout << "Podaj PESEL użytkownika: ";
+    cin >> pesel;
+    cout << "Podaj kwotę grzywny: ";
+    cin >> kwota;
+    cout << "Podaj powód grzywny: ";
+    cin >> powod;
+
+    auto it = find_if(uzytkownicy.begin(), uzytkownicy.end(), [&](Uzytkownik& u) {
+        return u.get_pesel() == pesel;
+        });
+
+    if (it != uzytkownicy.end()) {
+        it->dodaj_grzywne(kwota, powod);
+        cout << "Grzywna została dodana dla użytkownika o podanym PESELu." << endl;
+    }
+    else {
+        cout << "Użytkownik o podanym PESELu nie istnieje." << endl;
+    }
+    cout << endl;
+    char powrot_do_menu_glownego;
+    cout << "Jesli chcesz wrocic do menu glownego, wcisnij 'm'', jesli chcesz wyjsc, wcisnij dowolny klawisz." << endl;
+    cin >> powrot_do_menu_glownego;
+    if (powrot_do_menu_glownego == 'm') system_biblioteczny();
+}
+
+void case_2() {
+    system("cls");
+    int decyzja;
+    cout << "Wybrales obszar: 'Uzytkownik'." << endl;
+    cout << "Dokonaj wyboru konkretnej operacji z ponizszych dozwolonych: " << endl;
+    cout << "1. sprawdz dane uzytkownika " << endl;
+    cout << "2. sprawdz czy taki pesel jest juz w systemie " << endl;
+    cout << "3. dodaj uzytkownika " << endl;
+    cout << "4. edytuj dane uzytkownika " << endl;
+    cout << "5. usun uzytkownika z systemu" << endl;
+    cout << "6. sprawdz czy uzytkownik ma nieoplacone grzywny" << endl;
+    cout << "7. dodaj grzywne do uzytkownika. " << endl;
+    cout << "8. powrot do menu glownego. " << endl;
+    cout << "TWOJ WYBOR: ";
+    cin >> decyzja;
+    cout << endl;
+
+    switch (decyzja) {
+    case 1: {
+        case_2_1();
+        break;
+    }
+
+    case 2: {
+        case_2_2();
+        break;
+    }
+
+    case 3: {
+        case_2_3();
+        break;
+    }
+
+    case 4: {
+        case_2_4();
+        break;
+    }
+
+    case 5: {
+        case_2_5();
+        break;
+    }
+
+    case 6: {
+        case_2_6();
+        break;
+    }
+
+    case 7: {
+        case_2_7();
+        break;
+    }
+
+    case 8: {
+        system_biblioteczny();
+        break;
+    }
+
+    default: {
+        cout << "Niepoprawny wybór." << endl;
+        break;
+    }
+
+    }
+}
+
+void case_3_1() {
+    system("cls");
+    cout << "Wybrales segment: wyswietl wszystkich autorow " << endl;
+    Autor autor;
+    autor.wyswietl_wszystkich_autorow(autorzy);
+    cout << endl;
+    char powrot_do_menu_glownego;
+    cout << "Jesli chcesz wrocic do menu glownego, wcisnij 'm'', jesli chcesz wyjsc, wcisnij dowolny klawisz." << endl;
+    cin >> powrot_do_menu_glownego;
+    if (powrot_do_menu_glownego == 'm') system_biblioteczny();
+}
+
+void case_3_2() {
+    system("cls");
+    cout << "Wybrales obszar: sprawdz czy taki autor juz istnieje " << endl;
+    string imie, nazwisko;
+    cout << "Podaj imię autora do sprawdzenia: ";
+    cin >> imie;
+    cout << "Podaj nazwisko autora do sprawdzenia: ";
+    cin >> nazwisko;
+    Autor autor;
+    autor.czy_autor_istnieje(autorzy, imie, nazwisko);
+    cout << endl;
+    char powrot_do_menu_glownego;
+    cout << "Jesli chcesz wrocic do menu glownego, wcisnij 'm'', jesli chcesz wyjsc, wcisnij dowolny klawisz." << endl;
+    cin >> powrot_do_menu_glownego;
+    if (powrot_do_menu_glownego == 'm') system_biblioteczny();
+}
+
+void case_3_3() {
+    system("cls");
+    cout << "Wybrales obszar: dodaj autora " << endl;
+    string imie, nazwisko;
+    cout << "Podaj imię nowego autora: ";
+    cin >> imie;
+    cout << "Podaj nazwisko nowego autora: ";
+    cin >> nazwisko;
+    autorzy.push_back(Autor(imie, nazwisko));
+    cout << "Autor dodany do systemu." << endl;
+    cout << endl;
+    char powrot_do_menu_glownego;
+    cout << "Jesli chcesz wrocic do menu glownego, wcisnij 'm'', jesli chcesz wyjsc, wcisnij dowolny klawisz." << endl;
+    cin >> powrot_do_menu_glownego;
+    if (powrot_do_menu_glownego == 'm') system_biblioteczny();
+}
+
+void case_3_4() {
+    system("cls");
+    cout << "Wybrales obszar: edytuj dane autora " << endl;
+    string imie, nazwisko;
+    cout << "Podaj imię autora do edycji: ";
+    cin >> imie;
+    cout << "Podaj nazwisko autora do edycji: ";
+    cin >> nazwisko;
+    Autor autor;
+    autor.edytuj_dane_autora(autorzy, imie, nazwisko);
+    cout << endl;
+    char powrot_do_menu_glownego;
+    cout << "Jesli chcesz wrocic do menu glownego, wcisnij 'm'', jesli chcesz wyjsc, wcisnij dowolny klawisz." << endl;
+    cin >> powrot_do_menu_glownego;
+    if (powrot_do_menu_glownego == 'm') system_biblioteczny();
+}
+
+void case_3_5() {
+    system("cls");
+    cout << "Wybrales obszar: usun autora z systemu" << endl;
+    string imie, nazwisko;
+    cout << "Podaj imię autora do usunięcia: ";
+    cin >> imie;
+    cout << "Podaj nazwisko autora do usunięcia: ";
+    cin >> nazwisko;
+    Autor autor;
+    autor.usun_autora_z_systemu(autorzy, imie, nazwisko);
+    cout << endl;
+    char powrot_do_menu_glownego;
+    cout << "Jesli chcesz wrocic do menu glownego, wcisnij 'm'', jesli chcesz wyjsc, wcisnij dowolny klawisz." << endl;
+    cin >> powrot_do_menu_glownego;
+    if (powrot_do_menu_glownego == 'm') system_biblioteczny();
+}
+
+void case_3_6() {
+    system("cls");
+    cout << "Wybrales obszar: znajdz wszystkie ksiazki danego autora" << endl;
+    Autor autor;
+    cout << "Podaj imie autora: ";
+    string imie;
+    cin >> imie;
+    autor.set_imie(imie);
+
+    cout << "Podaj nazwisko autora: ";
+    string nazwisko;
+    cin >> nazwisko;
+    autor.set_nazwisko(nazwisko);
+
+    bool znaleziono = false;
+    for (auto& ksiazka : ksiazki) {
+        // Sprawdzenie, czy książka ma podanego autora
+        if (ksiazka.get_autor().get_imie() == autor.get_imie() && ksiazka.get_autor().get_nazwisko() == autor.get_nazwisko()) {
+            cout << ksiazka.get_tytul() << endl;
+            znaleziono = true;
+        }
+    }
+
+    if (!znaleziono) {
+        cout << "Brak książek autora " << autor.get_imie() << " " << autor.get_nazwisko() << endl;
+    }
+    cout << endl;
+    char powrot_do_menu_glownego;
+    cout << "Jesli chcesz wrocic do menu glownego, wcisnij 'm'', jesli chcesz wyjsc, wcisnij dowolny klawisz." << endl;
+    cin >> powrot_do_menu_glownego;
+    if (powrot_do_menu_glownego == 'm') system_biblioteczny();
+}
+
+void case_3_7() {
+    system("cls");
+    cout << "Wybrales obszar: dodaj ksiazke do autora." << endl;
+    Autor autor;
+    cout << "Podaj imie autora: ";
+    string imie;
+    cin >> imie;
+    autor.set_imie(imie);
+
+    cout << "Podaj nazwisko autora: ";
+    string nazwisko;
+    cin >> nazwisko;
+    autor.set_nazwisko(nazwisko);
+
+    // Szukamy autora w wektorze autorów
+    bool znaleziono_autora = false;
+    for (auto& a : autorzy) {
+        if (a.get_imie() == autor.get_imie() && a.get_nazwisko() == autor.get_nazwisko()) {
+            // Znaleziono autora, przypisujemy książki
+            cout << "Podaj tytul ksiazki: ";
+            string tytul;
+            cin >> tytul;
+
+            cout << "Podaj gatunek ksiazki: ";
+            string gatunek;
+            cin >> gatunek;
+            cout << endl;
+
+            cout << "Podaj date wydania ksiazki (dd mm rrrr): ";
+            int dzien, miesiac, rok;
+            cin >> dzien >> miesiac >> rok;
+            Data data_wydania(dzien, miesiac, rok);
+
+            cout << "podaj ISBN: ";
+            string isbn;
+            cin >> isbn;
+            Ksiazka nowa_ksiazka(autor, tytul, gatunek, data_wydania, isbn);
+            a.dodaj_ksiazke(nowa_ksiazka);
+            znaleziono_autora = true;
+            break;
+        }
+    }
+
+    if (!znaleziono_autora) {
+        cout << "Nie znaleziono autora o podanych danych." << endl;
+    }
+    cout << endl;
+    char powrot_do_menu_glownego;
+    cout << "Jesli chcesz wrocic do menu glownego, wcisnij 'm'', jesli chcesz wyjsc, wcisnij dowolny klawisz." << endl;
+    cin >> powrot_do_menu_glownego;
+    if (powrot_do_menu_glownego == 'm') system_biblioteczny();
+}
+
+void case_3() {
+    system("cls");
+    int decyzja;
+    cout << "Wybrales obszar: 'Autor'." << endl;
+    cout << "Dokonaj wyboru konkretnej operacji z ponizszych dozwolonych: " << endl;
+    cout << "1. wyswietl wszystkich autorow " << endl;
+    cout << "2. sprawdz czy taki autor juz istnieje " << endl;
+    cout << "3. dodaj autora " << endl;
+    cout << "4. edytuj dane autora " << endl;
+    cout << "5. usun autora z systemu" << endl;
+    cout << "6. znajdz wszystkie ksiazki danego autora" << endl;
+    cout << "7. dodaj ksiazke do autora." << endl;
+    cout << "8. powrot do menu glownego." << endl;
+    cout << "TWOJ wybor: ";
+    cin >> decyzja;
+    cout << endl;
+    switch (decyzja)
+    {
+
+    case 1: {
+        case_3_1();
+        break;
+    }
+
+    case 2: {
+        case_3_2();
+        break;
+    }
+
+    case 3: {
+        case_3_3();
+        break;
+    }
+
+    case 4: {
+        case_3_4();
+        break;
+    }
+
+    case 5: {
+        case_3_5();
+        break;
+    }
+
+    case 6: {
+        case_3_6();
+        break;
+    }
+
+    case 7: {
+        case_3_7();
+        break;
+    }
+
+    case 8: {
+        system_biblioteczny();
+        break;
+    }
+
+    default: {
+        cout << "Niepoprawny wybór." << endl;
+        break;
+    }
+    }
+}
+
+void system_biblioteczny() {
+    system("cls");
+    int wybor;
+    cout << "Witamy w systemie bibliotecznym SBA :)" << endl;
+    cout << "Proszę wybierać jeden z obszarów, w którym chcesz dokonać operacji: " << endl;
+    cout << "1. Wypozyczenie/ Zwrot" << endl;
+    cout << "2. Użytkownik" << endl;
+    cout << "3. Autor" << endl;
+    cout << "4. Ksiazka" << endl;
+    cout << "5. Status" << endl;
+    cout << "6. Biblioteka ogólne" << endl;
+    cout << "7. Wyjscie z systemu" << endl;
+    cout << "TWOJ WYBOR TO: ";
+    cin >> wybor;
+
+    switch (wybor) {
+    case 1: {
+        case_1();
+        break;
+    }
+    case 2: {
+        case_2();
+        break;
+    }
+    case 3: {
+        case_3();
+        break;
+    }
+
+    case 7: {
+        break;
+    }
+    }
+}
+
 int main()
 {
     //POMOCNICZE WYSWIETLENIA SPRAWDZAJACE POPRAWNOSC KODU
     //Data data1(10, 5, 2007);
-   // data1.wyswietl_date_wypozyczenia();
+    // data1.wyswietl_date_wypozyczenia();
     //data1.wyswietl_date_zwrotu();
-    Biblioteka biblioteka;
-
-    cout << endl << "Wszyscy uzytkownicy w bazie: " << endl;
+    
     // Tworzenie przykładowych autorów
     Autor autor1("Adam", "Mickiewicz");
     Autor autor2("Henryk", "Sienkiewicz");
@@ -552,7 +1360,7 @@ int main()
     string email1 = "email1@example.com";
     string email2 = "email2@example.com";
     string pesel1 = "12345678901";
-    string pesel2 = "10987654321";
+    string pesel2 = "101";
 
     Uzytkownik uzytkownik1("Jan", "Kowalski", telefon1, email1, pesel1);
     Uzytkownik uzytkownik2("Anna", "Nowak", telefon2, email2, pesel2);
@@ -561,488 +1369,29 @@ int main()
     Wypozyczenie wypozyczenie1(1, 1, 2023, ksiazka1, uzytkownik1);
     Wypozyczenie wypozyczenie2(2, 2, 2023, ksiazka2, uzytkownik2);
 
-    // Tworzenie wektorów książek, autorów i użytkowników
-    vector<Ksiazka> ksiazki = { ksiazka1, ksiazka2, ksiazka3, ksiazka4, ksiazka5, ksiazka6 };
-    vector<Autor> autorzy = { autor1, autor2, autor3, autor4, autor5, autor6 };
-    vector<Uzytkownik> uzytkownicy = { uzytkownik1, uzytkownik2 };
-    vector<Wypozyczenie> wypozyczenia = { wypozyczenie1, wypozyczenie2 };
+    // Dodawanie książek, autorów i użytkowników do wektorow
+    ksiazki.push_back(ksiazka1);
+    ksiazki.push_back(ksiazka2);
+    ksiazki.push_back(ksiazka3);
+    ksiazki.push_back(ksiazka4);
+    ksiazki.push_back(ksiazka5);
+    ksiazki.push_back(ksiazka6);
 
+    uzytkownicy.push_back(uzytkownik1);
+    uzytkownicy.push_back(uzytkownik2);
+
+    autorzy.push_back(autor1);
+    autorzy.push_back(autor2);
+    autorzy.push_back(autor3);
+    autorzy.push_back(autor4);
+    autorzy.push_back(autor5);
+    autorzy.push_back(autor6);
+
+    wypozyczenia.push_back(wypozyczenie1);
+    wypozyczenia.push_back(wypozyczenie2);
 
     //------------------------SYSTEM BIBLIOTECZNY----------------------------------------------------------
-    int wybor;
-    cout << "Witamy w systemie bibliotecznym SBA :)" << endl;
-    cout << "Proszę wybierać jeden z obszarów, w którym chcesz dokonać operacji: " << endl;
-    cout << "1. Wypozyczenie/ Zwrot" << endl;
-    cout << "2. Użytkownik" << endl;
-    cout << "3. Autor" << endl;
-    cout << "4. Ksiazka" << endl;
-    cout << "5. Status" << endl;
-    cout << "6. Biblioteka ogólne" << endl;
-    cout << "TWOJ WYBOR TO: ";
-    cin >> wybor;
-
-    switch (wybor) {
-    case 1: {
-        int decyzja;
-        cout << "Wybrales obszar: 'Wypozyczenie/Zwrot'." << endl;
-        cout << "Dokonaj wyboru konkretnej operacji z ponizszych dozwolonych: " << endl;
-        cout << "1. sprawdz wypozyczenie danej ksiazki przez isbn" << endl;
-        cout << "2. rozpocznij wypozyczenie danej ksiazki" << endl;
-        cout << "3. zakoncz wypozyczenie danej ksiazki" << endl;
-        cout << "4. sprawdz termin do kiedy ksiazka powinna zostac oddana" << endl;
-        cout << "5. zarezerwuj ksiazke" << endl;
-        cout << "Twój wybór: ";
-        cin >> decyzja;
-        cout << endl;
-        switch (decyzja) {
-        case 1: {
-            string isbn;
-            cout << "Podaj numer ISBN: ";
-            cin >> isbn;
-
-            bool found = false;
-            for (auto& wyp : wypozyczenia) {
-                for (auto& egz : wyp.get_ksiazka().get_egzemplarze()) {
-                    if (egz.get_ISBN() == isbn) {
-                        cout << "Książka o ISBN " << isbn << " jest wypożyczona przez użytkownika: "
-                            << wyp.get_uzytkownik().get_imie() << " " << wyp.get_uzytkownik().get_nazwisko()
-                            << " (PESEL: " << wyp.get_uzytkownik().get_pesel() << ")" << endl;
-                        found = true;
-                        break;
-                    }
-                }
-                if (found) break;
-            }
-            if (!found) {
-                cout << "Nie znaleziono wypożyczenia dla podanego numeru ISBN." << endl;
-            }
-            break;
-        }
-        case 2: {
-
-            string isbn, pesel;
-            cout << "Podaj ISBN książki do wypożyczenia: ";
-            cin >> isbn;
-            cout << "Podaj PESEL użytkownika: ";
-            cin >> pesel;
-
-            Ksiazka* ksiazka_do_wypozyczenia = nullptr;
-            Uzytkownik* uzytkownik_wypozyczajacy = nullptr;
-
-            for (auto& ks : ksiazki) {
-                for (auto& egz : ks.get_egzemplarze()) {
-                    if (egz.get_ISBN() == isbn) {
-                        ksiazka_do_wypozyczenia = &ks;
-                        break;
-                    }
-                }
-                if (ksiazka_do_wypozyczenia) break;
-            }
-
-            for (auto& uz : uzytkownicy) {
-                if (uz.get_pesel() == pesel) {
-                    uzytkownik_wypozyczajacy = &uz;
-                    break;
-                }
-            }
-
-            if (ksiazka_do_wypozyczenia && uzytkownik_wypozyczajacy) {
-                Wypozyczenie nowe_wypozyczenie(20, 5, 2024, *ksiazka_do_wypozyczenia, *uzytkownik_wypozyczajacy);
-                wypozyczenia.push_back(nowe_wypozyczenie);
-                cout << "Wypożyczono książkę!" << endl;
-            }
-            else {
-                cout << "Nie znaleziono książki lub użytkownika." << endl;
-            }
-            break;
-        }
-        case 3: {
-            string isbn, pesel;
-            cout << "Podaj ISBN książki do zwrotu: ";
-            cin >> isbn;
-            cout << "Podaj PESEL użytkownika: ";
-            cin >> pesel;
-
-            auto it = std::find_if(wypozyczenia.begin(), wypozyczenia.end(),
-                [&](Wypozyczenie& w) {
-                    return w.get_ksiazka().get_ISBN() == isbn && w.get_uzytkownik().get_pesel() == pesel;
-                });
-
-            if (it != wypozyczenia.end()) {
-                // Sprawdzenie terminu zwrotu
-                time_t now = time(0);
-                tm* ltm = localtime(&now);
-                Data dzisiaj(ltm->tm_mday, 1 + ltm->tm_mon, 1900 + ltm->tm_year);
-
-                // Zakładamy, że masz funkcję w Data do obliczenia różnicy w dniach
-                int dni_wypozyczenia = it->get_data_wypozyczenia().days_between(dzisiaj);
-
-                if (dni_wypozyczenia > 30) {
-                    cout << "Opóźniony termin zwrotu!" << endl;
-                }
-
-                wypozyczenia.erase(it);
-                cout << "Wypożyczenie zakończone." << endl;
-            }
-            else {
-                cout << "Nie znaleziono wypożyczenia." << endl;
-            }
-            break;
-        }
-        case 4: {
-
-            string isbn;
-            cout << "Podaj numer ISBN: ";
-            cin >> isbn;
-
-            // Wyświetlamy wypożyczone książki dla użytkownika na podstawie numeru ISBN
-            // Wyszukaj użytkownika w wektorze na podstawie numeru ISBN
-            for (auto& uzytkownik : uzytkownicy) {
-                if (biblioteka.czy_uzytkownik_wypozyczyl_ksiazke(isbn, uzytkownik)) {
-                    biblioteka.wyswietl_wypozyczenia_uzytkownika(isbn, uzytkownik);
-                    break;  // Jeśli znaleziono użytkownika, można przerwać pętlę
-                }
-            }
-
-        }
-        case 5: {}
-
-        }
-        break;
-    }
-    case 2:
-        int decyzja;
-        cout << endl << "Wybrales obszar: 'Uzytkownik'." << endl;
-        cout << "Dokonaj wyboru konkretnej operacji z ponizszych dozwolonych: " << endl;
-        cout << "1. sprawdz dane uzytkownika " << endl;
-        cout << "2. sprawdz czy taki pesel jest juz w systemie " << endl;
-        cout << "3. dodaj uzytkownika " << endl;
-        cout << "4. edytuj dane uzytkownika " << endl;
-        cout << "5. usun uzytkownika z systemu" << endl;
-        cout << "6. sprawdz czy uzytkownik ma nieoplacone grzywny" << endl;
-        cout << "7. dodaj grzywne do uzytkownika. " << endl;
-        cout << "TWOJ WYBOR: ";
-        cin >> decyzja;
-        cout << endl;
-
-        switch (decyzja) {
-        case 1: {
-            cout << "podaj pesel uzytkownika do wyswietlenia jego danych: ";
-            string pesel1;
-            cin >> pesel1;
-
-            bool znaleziono = false;
-            for (auto& uzytkownik : uzytkownicy) {
-                if (uzytkownik.czy_pesel_w_systemie(pesel1)) {
-                    znaleziono = true;
-                    uzytkownik.wyswietl_uzytkownika();
-                    break;
-                }
-            }
-
-            if (!znaleziono) {
-                cout << "Brak uzytkownika o podanym PESELu." << endl;
-            }
-            break;
-        }
-
-        case 2: {
-            cout << "podaj pesel uzytkownika do sprawdzenia czy jest w systemie: ";
-            string pesel2;
-            cin >> pesel2;
-            // Sprawdzenie czy użytkownik o podanym PESELu istnieje
-            bool znaleziono = false;
-            for (auto& uzytkownik : uzytkownicy) {
-                if (uzytkownik.czy_pesel_w_systemie(pesel2)) {
-                    znaleziono = true;
-                    cout << "uzytkownik o podanym peselu istnieje :) " << endl;
-
-                    break;
-                }
-            }
-
-            if (!znaleziono) {
-                cout << "Brak uzytkownika o podanym PESELu." << endl;
-            }
-            break; }
-
-        case 3: {
-            cout << "podaj pesel uzytkownika aby go dodac do systemu: ";
-            string pesel3;
-            cin >> pesel3;
-            // Sprawdzenie czy użytkownik o podanym PESELu istnieje
-            bool znaleziono = false;
-            for (auto& uzytkownik : uzytkownicy) {
-                if (uzytkownik.czy_pesel_w_systemie(pesel3)) {
-                    znaleziono = true;
-                    cout << "UWAGA! Taki pesel juz jest w bazie!" << endl;
-                    uzytkownik.wyswietl_uzytkownika();
-                    break;
-                }
-            }
-
-            if (!znaleziono) {
-                cout << "Brak uzytkownika o podanym PESELu. Mozna dodac do bazy :)" << endl;
-                cout << "Zaczynamy!" << endl;
-                Uzytkownik nowy_uzytkownik;
-                nowy_uzytkownik.Uzytkownik::dodaj_uzytkownika();
-                uzytkownicy.push_back(nowy_uzytkownik);
-                cout << "Nowy użytkownik został dodany do systemu." << endl;
-
-            }
-            break; }
-
-        case 4: {
-            cout << "wybrales segment edycji danych uzytkownika. " << endl;
-            cout << "podaj pesel uzytkownika do edycji jego danych: ";
-            string pesel4;
-            cin >> pesel4;
-            // Sprawdzenie czy użytkownik o podanym PESELu istnieje
-            //jesli tak to edycja jego danych dozwolona
-            bool znaleziono = false;
-            for (auto& uzytkownik : uzytkownicy) {
-                if (uzytkownik.czy_pesel_w_systemie(pesel4)) {
-                    znaleziono = true;
-                    uzytkownik.edytuj_dane_uzytkownika();
-                    break;
-                }
-            }
-
-            if (!znaleziono) {
-                cout << "Brak uzytkownika o podanym PESELu. Nie mozna edytowac." << endl;
-            }
-            break; }
-
-        case 5: {
-            cout << "podaj pesel uzytkownika do usuniecia go z systemu: ";
-            string pesel5;
-            cin >> pesel5;
-
-            bool znaleziono = false;
-            auto it = uzytkownicy.begin();
-            while (it != uzytkownicy.end()) {
-                if (it->czy_pesel_w_systemie(pesel5)) {
-                    znaleziono = true;
-                    cout << "Użytkownik o podanym PESELu znaleziony. Usuwanie użytkownika..." << endl;
-                    it = uzytkownicy.erase(it); // Usuń użytkownika z wektora
-                    cout << "Użytkownik został usunięty z systemu." << endl;
-                    break; // Przerywamy pętlę, bo użytkownik został znaleziony i usunięty
-                }
-                else {
-                    ++it;
-                }
-            }
-
-            if (!znaleziono) {
-                cout << "Brak uzytkownika o podanym PESELu." << endl;
-            }
-            break;
-        }
-
-        case 6: {
-            string pesel;
-            cout << "Podaj PESEL użytkownika: ";
-            cin >> pesel;
-
-            // Szukamy użytkownika o podanym PESELu
-            auto it = find_if(uzytkownicy.begin(), uzytkownicy.end(), [&](Uzytkownik& u) {
-                return u.get_pesel() == pesel;
-                });
-
-            if (it != uzytkownicy.end()) { // Jeśli użytkownik został znaleziony
-                if (it->czy_ma_nieoplacone_grzywny()) {
-                    cout << "Użytkownik ma nieopłacone grzywny." << endl;
-                    it->wyswietl_grzywny();
-                }
-                else {
-                    cout << "Użytkownik nie ma nieopłaconych grzywn." << endl;
-                }
-            }
-            else { // Jeśli użytkownik o podanym PESELu nie został znaleziony
-                cout << "Użytkownik o podanym PESELu nie istnieje." << endl;
-            }
-            break;
-        }
-
-        case 7: {
-            string pesel;
-            float kwota;
-            string powod;
-
-            cout << "Podaj PESEL użytkownika: ";
-            cin >> pesel;
-            cout << "Podaj kwotę grzywny: ";
-            cin >> kwota;
-            cout << "Podaj powód grzywny: ";
-            cin >> powod;
-
-            auto it = find_if(uzytkownicy.begin(), uzytkownicy.end(), [&](Uzytkownik& u) {
-                return u.get_pesel() == pesel;
-                });
-
-            if (it != uzytkownicy.end()) {
-                it->dodaj_grzywne(kwota, powod);
-                cout << "Grzywna została dodana dla użytkownika o podanym PESELu." << endl;
-            }
-            else {
-                cout << "Użytkownik o podanym PESELu nie istnieje." << endl;
-            }
-            break;
-        }
-        default:
-            cout << "Niepoprawny wybór." << endl;
-            break;
-
-
-
-        }
-
-
-    case 3: {
-        int decyzja;
-        cout << "Wybrales obszar: 'Autor'." << endl;
-        cout << "Dokonaj wyboru konkretnej operacji z ponizszych dozwolonych: " << endl;
-        cout << "1. wyswietl wszystkich autorow " << endl;
-        cout << "2. sprawdz czy taki autor juz istnieje " << endl;
-        cout << "3. dodaj autora " << endl;
-        cout << "4. edytuj dane autora " << endl;
-        cout << "5. usun autora z systemu" << endl;
-        cout << "6. znajdz wszystkie ksiazki danego autora" << endl;
-        cout << "7. dodaj ksiazke do autora." << endl;
-        cout << "TWOJ wybor: ";
-        cin >> decyzja;
-        cout << endl;
-        switch (decyzja)
-        {
-
-        case 1: {
-            Autor autor;
-            autor.wyswietl_wszystkich_autorow(autorzy);
-            break;
-
-        }
-
-        case 2: {
-            string imie, nazwisko;
-            cout << "Podaj imię autora do sprawdzenia: ";
-            cin >> imie;
-            cout << "Podaj nazwisko autora do sprawdzenia: ";
-            cin >> nazwisko;
-            Autor autor;
-            autor.czy_autor_istnieje(autorzy, imie, nazwisko);
-            break;
-        }
-
-        case 3: {
-            string imie, nazwisko;
-            cout << "Podaj imię nowego autora: ";
-            cin >> imie;
-            cout << "Podaj nazwisko nowego autora: ";
-            cin >> nazwisko;
-            autorzy.push_back(Autor(imie, nazwisko));
-            cout << "Autor dodany do systemu." << endl;
-            break;
-        }
-
-        case 4: {
-            string imie, nazwisko;
-            cout << "Podaj imię autora do edycji: ";
-            cin >> imie;
-            cout << "Podaj nazwisko autora do edycji: ";
-            cin >> nazwisko;
-            Autor autor;
-            autor.edytuj_dane_autora(autorzy, imie, nazwisko);
-            break;
-        }
-
-        case 5: {
-            string imie, nazwisko;
-            cout << "Podaj imię autora do usunięcia: ";
-            cin >> imie;
-            cout << "Podaj nazwisko autora do usunięcia: ";
-            cin >> nazwisko;
-            Autor autor;
-            autor.usun_autora_z_systemu(autorzy, imie, nazwisko);
-            break;
-        }
-        case 6: {
-            Autor autor;
-            cout << "Podaj imie autora: ";
-            string imie;
-            cin >> imie;
-            autor.set_imie(imie);
-
-            cout << "Podaj nazwisko autora: ";
-            string nazwisko;
-            cin >> nazwisko;
-            autor.set_nazwisko(nazwisko);
-
-            bool znaleziono = false;
-            for (auto& ksiazka : ksiazki) {
-                // Sprawdzenie, czy książka ma podanego autora
-                if (ksiazka.get_autor().get_imie() == autor.get_imie() && ksiazka.get_autor().get_nazwisko() == autor.get_nazwisko()) {
-                    cout << ksiazka.get_tytul() << endl;
-                    znaleziono = true;
-                }
-            }
-
-            if (!znaleziono) {
-                cout << "Brak książek autora " << autor.get_imie() << " " << autor.get_nazwisko() << endl;
-            }
-
-            break;
-        }
-        case 7: {
-            Autor autor;
-            cout << "Podaj imie autora: ";
-            string imie;
-            cin >> imie;
-            autor.set_imie(imie);
-
-            cout << "Podaj nazwisko autora: ";
-            string nazwisko;
-            cin >> nazwisko;
-            autor.set_nazwisko(nazwisko);
-
-            // Szukamy autora w wektorze autorów
-            bool znaleziono_autora = false;
-            for (auto& a : autorzy) {
-                if (a.get_imie() == autor.get_imie() && a.get_nazwisko() == autor.get_nazwisko()) {
-                    // Znaleziono autora, przypisujemy książki
-                    cout << "Podaj tytul ksiazki: ";
-                    string tytul;
-                    cin >> tytul;
-
-                    cout << "Podaj gatunek ksiazki: ";
-                    string gatunek;
-                    cin >> gatunek;
-                    cout << endl;
-
-                    cout << "Podaj date wydania ksiazki (dd mm rrrr): ";
-                    int dzien, miesiac, rok;
-                    cin >> dzien >> miesiac >> rok;
-                    Data data_wydania(dzien, miesiac, rok);
-
-                    cout << "podaj ISBN: ";
-                    string isbn;
-                    cin >> isbn;
-                    Ksiazka nowa_ksiazka(autor, tytul, gatunek, data_wydania, isbn);
-                    a.dodaj_ksiazke(nowa_ksiazka);
-                    znaleziono_autora = true;
-                    break;
-                }
-            }
-
-            if (!znaleziono_autora) {
-                cout << "Nie znaleziono autora o podanych danych." << endl;
-            }
-        }
-        default:
-            cout << "Niepoprawny wybór." << endl;
-            break;
-        }
-    }
-    }
+    system_biblioteczny();
     return 0;
 
 }
