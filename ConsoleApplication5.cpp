@@ -404,21 +404,6 @@ public:
     }
 
 
-
-    void rezerwuj(Uzytkownik& uzytkownik) {
-        if (status == StatusKsiazki::Dostepna) {
-            status = StatusKsiazki::Zarezerwowana;
-            zarezerwowal = &uzytkownik;
-        }
-    }
-
-    void oddaj() {
-        status = StatusKsiazki::Dostepna;
-        zarezerwowal = nullptr;
-    }
-
-
-
     void dodaj_egzemplarz(Egzemplarz& e) { egzemplarze.push_back(e); }
     void usun_egzemplarz() { egzemplarze.pop_back(); }
 
