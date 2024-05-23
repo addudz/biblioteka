@@ -14,15 +14,12 @@ class Wypozyczenie;
 class Data;
 class Egzemplarz;
 
-
 // Enum do reprezentowania statusu książki
 enum class StatusKsiazki {
     Dostepna,
     Wypozyczona,
     Zarezerwowana
 };
-
-
 
 class Data {
 private:
@@ -235,9 +232,6 @@ public:
 
 };
 
-
-
-
 class Autor : public Osoba {
     vector<Ksiazka> ksiazki;
 public:
@@ -340,7 +334,6 @@ public:
 
 };
 
-
 class Egzemplarz {
 private:
     string wydanie;
@@ -372,7 +365,7 @@ private:
 public:
     // Konstruktor
     Ksiazka(Autor& a, string& t, string& g, Data& d, string isb) : autor(a), tytul(t), gatunek(g), data_wydania(d), ISBN(isb) {}
-
+    Ksiazka() {}
     // Gettery
     Autor get_autor() { return autor; }
     string get_tytul() { return tytul; }
@@ -436,6 +429,7 @@ public:
         }
         return false; // Zwracamy false, jeśli nie znaleziono egzemplarza o podanym ISBN
     }
+
 };
 
 class Wypozyczenie : public Data {
@@ -473,7 +467,6 @@ public:
             << " " << uzytkownik.get_nazwisko() << endl;
     }
 };
-
 
 class Biblioteka {
 private:
@@ -545,11 +538,8 @@ public:
     }
 };
 
-
-Biblioteka biblioteka;
-
 // Deklaracja wektorów książek, autorów i użytkowników
-
+Biblioteka biblioteka;
 vector<Ksiazka> ksiazki;
 vector<Autor> autorzy;
 vector<Uzytkownik> uzytkownicy;
@@ -752,6 +742,7 @@ void case_1() {
     }
     default: {
         cout << "Niepoprawny wybór." << endl;
+        case_1();
         break;
     }
     }  
@@ -1025,6 +1016,7 @@ void case_2() {
 
     default: {
         cout << "Niepoprawny wybór." << endl;
+        case_2();
         break;
     }
 
@@ -1170,7 +1162,7 @@ void case_3_7() {
             cout << "Podaj gatunek ksiazki: ";
             string gatunek;
             cin >> gatunek;
-            cout << endl;
+            //cout << endl;
 
             cout << "Podaj date wydania ksiazki (dd mm rrrr): ";
             int dzien, miesiac, rok;
@@ -1182,6 +1174,7 @@ void case_3_7() {
             cin >> isbn;
             Ksiazka nowa_ksiazka(autor, tytul, gatunek, data_wydania, isbn);
             a.dodaj_ksiazke(nowa_ksiazka);
+            ksiazki.push_back(nowa_ksiazka);
             znaleziono_autora = true;
             break;
         }
@@ -1258,9 +1251,296 @@ void case_3() {
 
     default: {
         cout << "Niepoprawny wybór." << endl;
+        case_3();
         break;
     }
     }
+}
+
+void case_4_1() {
+    system("cls");
+    cout << "Wybrales obszar: wyswietl wszystkie ksiazki danego autora " << endl;
+    Autor autor;
+    cout << "Podaj imie autora: ";
+    string imie;
+    cin >> imie;
+    autor.set_imie(imie);
+
+    cout << "Podaj nazwisko autora: ";
+    string nazwisko;
+    cin >> nazwisko;
+    autor.set_nazwisko(nazwisko);
+
+    bool znaleziono = false;
+    for (auto& ksiazka : ksiazki) {
+        // Sprawdzenie, czy książka ma podanego autora
+        if (ksiazka.get_autor().get_imie() == autor.get_imie() && ksiazka.get_autor().get_nazwisko() == autor.get_nazwisko()) {
+            cout << ksiazka.get_tytul() << endl;
+            znaleziono = true;
+        }
+    }
+
+    if (!znaleziono) {
+        cout << "Brak książek autora " << autor.get_imie() << " " << autor.get_nazwisko() << endl;
+    }
+    cout << endl;
+    char powrot_do_menu_glownego;
+    cout << "Jesli chcesz wrocic do menu glownego, wcisnij 'm'', jesli chcesz wyjsc, wcisnij dowolny klawisz." << endl;
+    cin >> powrot_do_menu_glownego;
+    if (powrot_do_menu_glownego == 'm') system_biblioteczny();
+}
+
+void case_4_2() {
+    system("cls");
+    cout << "Wybrales obszar: sprawdz czy sa dostepne egzemplarze ksiazki " << endl;
+    Ksiazka ksiazka;
+    string tytul;
+    cout << "Podaj tytul ksiazki: ";
+    cin.ignore();
+    getline(cin, tytul);
+    ksiazka.set_tytul(tytul);
+
+    bool znaleziono = false;
+    for (auto& ksi : ksiazki) {
+        if (ksi.get_tytul() == ksiazka.get_tytul() ) {
+            if (!ksi.get_egzemplarze().empty()) {
+                cout<< "Istnieja dostepne egzemplarze ksiazki " << ksiazka.get_tytul() << endl;
+                znaleziono = true;
+            }
+
+        }
+    }
+
+    if (!znaleziono) {
+        cout << "Brak dostepnego egzemplarza ksiazki " << ksiazka.get_tytul() << endl;
+    }
+    cout << endl;
+    char powrot_do_menu_glownego;
+    cout << "Jesli chcesz wrocic do menu glownego, wcisnij 'm'', jesli chcesz wyjsc, wcisnij dowolny klawisz." << endl;
+    cin >> powrot_do_menu_glownego;
+    if (powrot_do_menu_glownego == 'm') system_biblioteczny();
+}
+
+//tu cos nie dziala
+void case_4_3() {
+    system("cls");
+    cout << "Wybrales obszar: dodaj ksiazke." << endl;
+    Autor autor;
+    string imie;
+    cout << "Podaj imie autora ksiazki: ";
+    cin.ignore();
+    getline(cin,imie);
+    autor.set_imie(imie);
+
+    string nazwisko;
+    cout << "Podaj nazwisko autora ksiazki: ";
+    cin.ignore();
+    getline(cin,nazwisko);
+    autor.set_nazwisko(nazwisko);
+
+    // Szukamy autora w wektorze autorów
+    bool znaleziono_autora = false;
+    for (auto& a : autorzy) {
+        if (a.get_imie() == autor.get_imie() && a.get_nazwisko() == autor.get_nazwisko()) {
+            // Znaleziono autora, przypisujemy książki
+            string tytul;
+            cout << "Podaj tytul ksiazki: ";
+            cin.ignore();
+            getline(cin,tytul);
+
+            string gatunek;
+            cout << "Podaj gatunek ksiazki: ";
+            cin.ignore();
+            getline(cin, gatunek);
+            //cout << endl;
+
+            int dzien, miesiac, rok;
+            cout << "Podaj date wydania ksiazki (dd mm rrrr): ";
+            cin >> dzien >> miesiac >> rok;
+            Data data_wydania(dzien, miesiac, rok);
+
+            string isbn;
+            cout << "podaj ISBN: ";
+            cin.ignore();
+            getline(cin, isbn);
+            Ksiazka nowa_ksiazka(autor, tytul, gatunek, data_wydania, isbn);
+            a.dodaj_ksiazke(nowa_ksiazka);
+            ksiazki.push_back(nowa_ksiazka);
+            znaleziono_autora = true;
+            break;
+        }
+    }
+    if (!znaleziono_autora) {
+        cout << "Nie znaleziono autora o podanych danych." << endl;
+        cout << "Jesli chcesz dodac autora do bazy, przejdz do menu głównego i wybierz opcje nr 3." << endl;
+    }
+    cout << endl;
+    char powrot_do_menu_glownego;
+    cout << "Jesli chcesz wrocic do menu glownego, wcisnij 'm'', jesli chcesz wyjsc, wcisnij dowolny klawisz." << endl;
+    cin >> powrot_do_menu_glownego;
+    if (powrot_do_menu_glownego == 'm') system_biblioteczny();
+}
+
+//tu cos nie dziala
+void case_4_4() {
+    system("cls");
+    cout << "Wybrales obszar: usun ksiazke z systemu " << endl;
+    Ksiazka ksiazka;
+    string tytul;
+    cout << "Podaj tytul ksiazki, ktora chcesz usunac, spowoduje to usuniecie z systemu wszystkich jej egzemplarzy: ";
+    cin.ignore();
+    getline(cin, tytul);
+    ksiazka.set_tytul(tytul);
+    
+    bool znaleziono = false;
+    int i = 0;
+    for (auto& ksi : ksiazki) {
+        if (ksi.get_tytul() == ksiazka.get_tytul()) {
+            ksiazki.erase(ksiazki.begin()+i);
+        }
+        i++;
+    }
+
+    if (!znaleziono) {
+        cout << "Nie znaleziono ksiazki o podanym tytule." << endl;
+    }
+
+    cout << endl;
+    char powrot_do_menu_glownego;
+    cout << "Jesli chcesz wrocic do menu glownego, wcisnij 'm'', jesli chcesz wyjsc, wcisnij dowolny klawisz." << endl;
+    cin >> powrot_do_menu_glownego;
+    if (powrot_do_menu_glownego == 'm') system_biblioteczny();
+}
+
+void case_4() {
+    system("cls");
+    int decyzja;
+    cout << "Wybrales obszar: 'Ksiazka'." << endl;
+    cout << "Dokonaj wyboru konkretnej operacji z ponizszych dozwolonych: " << endl;
+    cout << "1. wyswietl wszystkie ksiazki danego autora " << endl;
+    cout << "2. sprawdz czy sa dostepne egzemplarze ksiazki " << endl;
+    cout << "3. dodaj ksiazke " << endl;
+    cout << "4. usun ksiazke z systemu" << endl;
+    cout << "5. powrot do menu glownego." << endl;
+    cout << "TWOJ wybor: ";
+    cin >> decyzja;
+    cout << endl;
+    switch (decyzja) {
+    case 1: {
+        case_4_1();
+        break;
+    }
+    case 2: {
+        case_4_2();
+        break;
+    }
+    case 3: {
+        case_4_3();
+        break;
+    }
+    case 4: {
+        case_4_4();
+        break;
+    }
+    case 5: {
+        system_biblioteczny();
+        break;
+    }
+    default: {
+        cout << "Niepoprawny wybór." << endl;
+        case_4();
+        break;
+    }
+    }
+}
+
+void case_5_1() {
+    system("cls");
+    cout << "Wybrales obszar: sprawdz status ksiazki" << endl;
+    string isbn;
+    cout << "Podaj numer ISBN: ";
+    cin >> isbn;
+
+    bool found = false;
+    for (auto& wyp : wypozyczenia) {
+        for (auto& egz : wyp.get_ksiazka().get_egzemplarze()) {
+            if (egz.get_ISBN() == isbn) {
+                if (wyp.get_ksiazka().get_status() == StatusKsiazki::Dostepna) {
+                    cout << "Status książki o ISBN " << isbn << ": Dostepna" << endl;
+                }
+                else if (wyp.get_ksiazka().get_status() == StatusKsiazki::Zarezerwowana) {
+                    cout << "Status książki o ISBN " << isbn << ": Zarezerwowana" << endl;
+                }
+                else {
+                    cout << "Status książki o ISBN " << isbn << ": Wypozyczona" << endl;
+                }
+                found = true;
+                break;
+            }
+        }
+        if (found) break;
+    }
+    if (!found) {
+        cout << "Nie znaleziono ksiazki o podanym numerze ISBN." << endl;
+    }
+
+    cout << endl;
+    char powrot_do_menu_glownego;
+    cout << "Jesli chcesz wrocic do menu glownego, wcisnij 'm'', jesli chcesz wyjsc, wcisnij dowolny klawisz." << endl;
+    cin >> powrot_do_menu_glownego;
+    if (powrot_do_menu_glownego == 'm') system_biblioteczny();
+}
+
+void case_5() {
+    system("cls");
+    int decyzja;
+    cout << "Wybrales obszar: 'Statusy'." << endl;
+    cout << "Dokonaj wyboru konkretnej operacji z ponizszych dozwolonych: " << endl;
+    cout << "1. sprawdz status ksiazki " << endl;
+    cout << "2. powrot do menu glownego." << endl;
+    cout << "TWOJ wybor: ";
+    cin >> decyzja;
+    cout << endl;
+    switch (decyzja) {
+    case 1: {
+        case_5_1();
+        break;
+    }
+    case 2: {
+        system_biblioteczny();
+        break;
+    }
+    default: {
+        cout << "Niepoprawny wybór." << endl;
+        case_5();
+        break;
+    }
+    }
+
+}
+
+void case_6() {
+    system("cls");
+    int decyzja;
+    cout << "Wybrales obszar: Biblioteka ogólne" << endl;
+    cout << "Kontakt: " << endl;
+    cout << "EMAIL: biblioteka@email.com " << endl;
+    cout << "TELEFON: 000000000" << endl;
+    cout << "Wybierz '1' aby powrocic do menu glownego: ";
+    cin >> decyzja;
+    cout << endl;
+    switch (decyzja) {
+    case 1: {
+        system_biblioteczny();
+        break;
+    }
+    default: {
+        cout << "Niepoprawny wybór." << endl;
+        case_6();
+        break;
+    }
+    }
+
 }
 
 void system_biblioteczny() {
@@ -1291,8 +1571,24 @@ void system_biblioteczny() {
         case_3();
         break;
     }
-
+    case 4: {
+        case_4();
+        break;
+    }
+    case 5: {
+        case_5();
+        break;
+    }
+    case 6: {
+        case_6();
+        break;
+    }
     case 7: {
+        break;
+    }
+    default: {
+        cout << "Niepoprawny wybór." << endl;
+        system_biblioteczny();
         break;
     }
     }
