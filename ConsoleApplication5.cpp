@@ -1321,7 +1321,6 @@ void case_4_2() {
     if (powrot_do_menu_glownego == 'm') system_biblioteczny();
 }
 
-//tu cos nie dziala
 void case_4_3() {
     system("cls");
     cout << "Wybrales obszar: dodaj ksiazke." << endl;
@@ -1381,7 +1380,6 @@ void case_4_3() {
     if (powrot_do_menu_glownego == 'm') system_biblioteczny();
 }
 
-//tu cos nie dziala
 void case_4_4() {
     system("cls");
     cout << "Wybrales obszar: usun ksiazke z systemu " << endl;
